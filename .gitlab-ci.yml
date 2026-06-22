@@ -1,8 +1,75 @@
-# Lint-only CI. Public repo, so a stock Python image — no private OCIR base
-# image or pull secret needed. The OCI SDK is treated as an ignored module in
-# .pylintrc, so it isn't installed here (keeps the job fast).
+include:
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/bump-version.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/tag.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/release.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/renovate.yml'
+
+stages:
+  - validate
+  - tag
+  - release
+  - renovate
+
+default:
+  tags:
+    - self-hosted
+
+# Lint-only test gate — this is a single-file operational daemon, not a tested
+# library, so there's no tox/diff-cover matrix (see MR !1). The OCI SDK is an
+# ignored module in .pylintrc, so it isn't installed here.
 lint:
+  stage: validate
   image: python:3.12-slim
   script:
     - pip install --quiet pylint
     - pylint rotate_session.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+
+# Auto-bump the patch version (and prepend a CHANGELOG entry) on Renovate's
+# dev-dependency MRs so each one merges as its own taggable version.
+bump-version:
+  extends: .bump-version
+  variables:
+    GITLAB_PUSH_TOKEN: $RENOVATE_TOKEN
+    BUMP_CHANGELOG: 'true'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\/dev-/
+
+# On merge to main: tag v<VERSION> (no-op if the tag already exists) ...
+tag-build:
+  extends: .tag
+  stage: tag
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_success
+
+# ... and cut a GitLab Release from that tag, using the CHANGELOG section.
+release:
+  extends: .release
+  stage: release
+  needs:
+    - job: tag-build
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_success
+
+# Scheduled pipeline (weekly schedule provisioned in terraform/infra) opens
+# dependency-update MRs from renovate.json.
+renovate:
+  extends: .renovate
+  stage: renovate
+  variables:
+    GITHUB_COM_TOKEN: $GITHUB_BOT_TOKEN
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

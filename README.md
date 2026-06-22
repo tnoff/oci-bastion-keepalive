@@ -27,20 +27,25 @@ early, it rotates immediately instead of waiting for the timer.
 
 ## Requirements
 
-- Python 3.9+ and the [OCI Python SDK](https://pypi.org/project/oci/) (`pip install oci`)
+- Python 3.10+ (the [OCI Python SDK](https://pypi.org/project/oci/) is pulled in
+  as a dependency on install)
 - A configured OCI profile (`~/.oci/config`) with permission to manage bastion
   sessions and read the target cluster
 - `ssh` on `PATH`, and an SSH keypair registered for bastion sessions
 
-## Usage
+## Install
 
 ```sh
 python -m venv venv && . venv/bin/activate
-pip install oci
+pip install .          # installs the `oci-bastion-keepalive` command + deps
+```
 
+## Usage
+
+```sh
 export OKE_CLUSTER_OCID=ocid1.cluster.oc1...
 export OKE_BASTION_OCID=ocid1.bastion.oc1...
-python rotate_session.py
+oci-bastion-keepalive          # or: python rotate_session.py
 ```
 
 Point your kubeconfig at `https://127.0.0.1:6443` and leave the daemon running.

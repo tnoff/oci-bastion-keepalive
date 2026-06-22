@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oci-bastion-keepalive"
+description = "Keep an OCI bastion SSH tunnel to a private OKE API server alive across the session hard-TTL by rotating sessions under a fixed local port"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+authors = [
+    { name = "Tyler D. North", email = "me@tyler-north.com" },
+]
+requires-python = ">=3.10"
+dynamic = ["version"]
+dependencies = [
+    "oci==2.178.0",
+]
+
+[project.urls]
+Homepage = "https://gitlab.com/tnoff-projects/oci-bastion-keepalive"
+
+[project.scripts]
+oci-bastion-keepalive = "rotate_session:main"
+
+[tool.setuptools]
+py-modules = ["rotate_session"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
