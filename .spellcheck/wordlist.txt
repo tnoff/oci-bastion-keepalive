@@ -1,0 +1,15 @@
+Ctrl
+keepalive
+keypair
+kubeconfig
+Kubernetes
+oci
+OCI
+OCIDs
+OKE
+SDK
+systemd
+TCP
+TLS
+TTL
+venv

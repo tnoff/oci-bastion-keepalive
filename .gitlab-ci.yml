@@ -11,41 +11,63 @@ include:
   - project: 'tnoff-projects/github-workflows'
     ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
     file: '/gitlab/renovate.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/spellcheck.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/trufflehog.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    file: '/gitlab/discord-notify.yml'
 
 stages:
   - validate
   - tag
   - release
+  - notify
   - renovate
 
 default:
   tags:
     - self-hosted
 
-# Lint-only test gate — this is a single-file operational daemon, not a tested
-# library, so there's no tox/diff-cover matrix (see MR !1). The OCI SDK is an
-# ignored module in .pylintrc, so it isn't installed here.
+# Static-analysis gate via tox (pylint + bandit). Lint-only by design — this is
+# a single-file operational daemon, not a tested library, so there's no
+# tox pytest/diff-cover matrix.
 lint:
   stage: validate
   image: python:3.12-slim
   script:
-    - pip install --quiet pylint
-    - pylint rotate_session.py
+    - pip install --quiet tox
+    - tox
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
 
-# Auto-bump the patch version (and prepend a CHANGELOG entry) on Renovate's
-# dev-dependency MRs so each one merges as its own taggable version.
+spellcheck:
+  extends: .spellcheck
+
+trufflehog:
+  extends: .trufflehog
+  stage: validate
+  rules:
+    # Fork MRs require a project member to manually trigger jobs.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# Auto-bump the patch version (and prepend a CHANGELOG entry) on Renovate MRs
+# so each one merges as its own taggable version.
 bump-version:
   extends: .bump-version
   variables:
     GITLAB_PUSH_TOKEN: $RENOVATE_TOKEN
     BUMP_CHANGELOG: 'true'
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\/dev-/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//
 
-# On merge to main: tag v<VERSION> (no-op if the tag already exists) ...
+# On merge to main: tag v<VERSION> (no-op if it exists) ...
 tag-build:
   extends: .tag
   stage: tag
@@ -64,6 +86,54 @@ release:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_success
 
+notify-mr:
+  extends: .discord-notify
+  stage: notify
+  needs: []
+  variables:
+    NOTIFY_TYPE: mr_opened
+    DISCORD_WEBHOOK_URL: $DISCORD_MR_OPENED_WEBHOOK
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+
+notify-merged:
+  extends: .discord-notify
+  stage: notify
+  needs: []
+  variables:
+    NOTIFY_TYPE: mr_merged
+    DISCORD_WEBHOOK_URL: $DISCORD_MR_MERGED_WEBHOOK
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: always
+
+notify-tag-failure:
+  extends: .discord-notify
+  stage: notify
+  needs: [tag-build]
+  variables:
+    NOTIFY_TYPE: failure
+    DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_failure
+
+notify-release-failure:
+  extends: .discord-notify
+  stage: notify
+  needs: [release]
+  allow_failure: true
+  variables:
+    NOTIFY_TYPE: failure
+    DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
+    NOTIFY_MESSAGE: 'Release job failed'
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+      when: on_failure
+
 # Scheduled pipeline (weekly schedule provisioned in terraform/infra) opens
 # dependency-update MRs from renovate.json.
 renovate:
@@ -73,3 +143,15 @@ renovate:
     GITHUB_COM_TOKEN: $GITHUB_BOT_TOKEN
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
+
+notify-renovate-failure:
+  extends: .discord-notify
+  stage: renovate
+  needs: [renovate]
+  variables:
+    NOTIFY_TYPE: failure
+    DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
+    NOTIFY_MESSAGE: 'Renovate failed'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: on_failure

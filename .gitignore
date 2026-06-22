@@ -7,6 +7,10 @@ build/
 dist/
 *.egg-info/
 
+# pyspelling compiled dictionary
+dictionary.dic
+.tox/
+
 # Local, secret-bearing helper (real OCIDs)
 generate_session.sh
 .oci/
