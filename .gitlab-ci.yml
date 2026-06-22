@@ -42,8 +42,11 @@ lint:
     - pip install --quiet tox
     - tox
   rules:
+    # MR-only: main advances only via FF/squash merges of validated MRs (direct
+    # push is blocked), so re-linting the merge commit is redundant. This keeps
+    # the whole validate stage off the default-branch pipeline (matches
+    # spellcheck/trufflehog), leaving merges to run tag -> release -> notify.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
 
 spellcheck:
   extends: .spellcheck
