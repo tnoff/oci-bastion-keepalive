@@ -1,0 +1,22 @@
+[Unit]
+Description=Self-rotating OCI bastion port-forward to the OKE API server
+Documentation=https://gitlab.com/tnoff-projects/oci-bastion-keepalive/-/blob/main/rotate_session.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust these paths if your checkout / venv live elsewhere. The venv must
+# have the `oci` SDK installed (pip install oci).
+WorkingDirectory=%h/Code/oci-bastion-keepalive
+ExecStart=%h/Code/oci-bastion-keepalive/venv/bin/python %h/Code/oci-bastion-keepalive/rotate_session.py
+EnvironmentFile=%h/.config/oke-rotator/rotate_session.env
+# SIGINT (not the default SIGTERM) so the script's KeyboardInterrupt cleanup
+# runs and the active bastion session is deleted on `systemctl --user stop`.
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

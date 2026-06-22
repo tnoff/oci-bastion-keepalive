@@ -1,0 +1,8 @@
+# Lint-only CI. Public repo, so a stock Python image — no private OCIR base
+# image or pull secret needed. The OCI SDK is treated as an ignored module in
+# .pylintrc, so it isn't installed here (keeps the job fast).
+lint:
+  image: python:3.12-slim
+  script:
+    - pip install --quiet pylint
+    - pylint rotate_session.py

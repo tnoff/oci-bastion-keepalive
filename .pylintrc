@@ -1,0 +1,22 @@
+[MAIN]
+# Lint runs without the (heavy) OCI SDK installed; treat it as an external
+# module so `import oci` and its dynamic members don't trip import/no-member.
+ignored-modules=oci
+
+[DESIGN]
+# Config is an environment-variable bag — a high attribute count is expected
+# and splitting it would be artificial.
+max-attributes=20
+# The bring-up helpers thread (oci_client, cfg, cluster_ip, ttl, port) through
+# the call chain; six is the natural arity, not a smell.
+max-args=6
+
+[MESSAGES CONTROL]
+# This is a single-file utility whose module docstring documents behaviour and
+# every config knob exhaustively; per-method/-class docstrings would be noise,
+# and the data/config holders are intentionally method-light. Every error- and
+# warning-level check that catches real bugs stays enabled.
+disable=
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods

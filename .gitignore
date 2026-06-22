@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+
+# Local, secret-bearing helper (real OCIDs)
+generate_session.sh
+.oci/
