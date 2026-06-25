@@ -1,12 +1,13 @@
 [MAIN]
-# Lint runs without the (heavy) OCI SDK installed; treat it as an external
-# module so `import oci` and its dynamic members don't trip import/no-member.
-ignored-modules=oci
+# Lint runs without the (heavy) OCI / kubernetes SDKs installed; treat them as
+# external modules so the imports and their dynamic members don't trip
+# import-error / no-member.
+ignored-modules=oci,kubernetes
 
 [DESIGN]
 # Config is an environment-variable bag — a high attribute count is expected
 # and splitting it would be artificial.
-max-attributes=20
+max-attributes=22
 # The bring-up helpers thread (oci_client, cfg, cluster_ip, ttl, port) through
 # the call chain; six is the natural arity, not a smell.
 max-args=6

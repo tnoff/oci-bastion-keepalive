@@ -51,6 +51,23 @@ Configuration is entirely via environment variables (no OCIDs baked in):
                          recreating it (default: 6)
     SSH_RETRY            seconds between ssh attempts on the same session (default: 5)
 
+Managed port-forwards (optional): the daemon can also hold local port-forwards
+to in-cluster workloads alongside the API relay, so they stop going stale the
+way a hand-run `kubectl port-forward` does ("error: lost connection to pod").
+Each is bound for the daemon's whole life and reconnects to a fresh pod on every
+new connection, so it transparently survives pod restarts and tunnel rotations.
+
+    PORT_FORWARD_<n>     one forward per indexed var (gaps allowed), value:
+                           <namespace>/<kind>/<name>:<localPort>:<remotePort>
+                         e.g. PORT_FORWARD_1=monitoring/svc/grafana:3000:3000
+                         <kind> is svc/service, pod, or deploy/deployment.
+    KUBECONFIG           kubeconfig for the in-cluster client (default: ~/.kube/config)
+    KUBE_CONTEXT         kubeconfig context to use (default: current-context)
+
+The port-forward client talks to 127.0.0.1:FRONT_PORT -- it rides this same
+relay and authenticates with the kubeconfig's OCI exec-plugin. With no
+PORT_FORWARD_* set the feature is dormant and the daemon behaves as before.
+
 Run it in the foreground (Ctrl-C cleans up sessions + tunnels):
 
     source venv/bin/activate          # OCI SDK + exec-plugin on PATH
@@ -63,6 +80,7 @@ import asyncio
 import http.client
 import logging
 import os
+import re
 import shlex
 import ssl
 import sys
@@ -70,6 +88,10 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import oci
+from kubernetes import __version__ as kube_version
+from kubernetes import client as kube_client
+from kubernetes import config as kube_config
+from kubernetes.stream import portforward
 
 log = logging.getLogger("session-rotator")
 
@@ -124,6 +146,10 @@ class Config:
         self.ssh_settle = int(_env("SSH_SETTLE", "5"))
         self.ssh_attempts = int(_env("SSH_ATTEMPTS", "6"))
         self.ssh_retry = int(_env("SSH_RETRY", "5"))
+        # Managed port-forwards (optional; empty => feature dormant).
+        self.forwards = _parse_forwards()
+        self.kubeconfig = os.path.expanduser(_env("KUBECONFIG", "~/.kube/config"))
+        self.kube_context = _env("KUBE_CONTEXT")
 
 
 class Tunnel:
@@ -132,6 +158,51 @@ class Tunnel:
         self.proc = proc
         self.port = port
         self.expiry = expiry
+
+
+_FORWARD_KINDS = {"svc", "service", "pod", "deploy", "deployment"}
+_FORWARD_RE = re.compile(r"^PORT_FORWARD_(\d+)$")
+
+
+class Forward:
+    def __init__(self, ns, kind, name, local_port, remote_port):
+        self.ns = ns
+        self.kind = kind
+        self.name = name
+        self.local_port = local_port
+        self.remote_port = remote_port
+
+    def __str__(self):
+        return f"{self.ns}/{self.kind}/{self.name} :{self.local_port}->:{self.remote_port}"
+
+
+def _parse_forwards():
+    """Collect PORT_FORWARD_<n> env vars into Forward objects, ordered by index.
+
+    Each value is "<namespace>/<kind>/<name>:<localPort>:<remotePort>", e.g.
+    "monitoring/svc/grafana:3000:3000". Missing indices are tolerated; a
+    malformed value aborts startup rather than silently dropping a forward.
+    """
+    indexed = sorted(
+        (int(m.group(1)), key, val)
+        for key, val in os.environ.items()
+        if (m := _FORWARD_RE.match(key))
+    )
+    forwards = []
+    for _, key, val in indexed:
+        try:
+            target, local_s, remote_s = val.rsplit(":", 2)
+            ns, kind, name = target.split("/")
+            kind = kind.lower()
+            if kind not in _FORWARD_KINDS:
+                raise ValueError(f"kind must be one of {sorted(_FORWARD_KINDS)}, got '{kind}'")
+            forwards.append(Forward(ns, kind, name, int(local_s), int(remote_s)))
+        except ValueError as exc:
+            sys.exit(
+                f"error: {key}='{val}' is malformed -- want "
+                f"<namespace>/<kind>/<name>:<localPort>:<remotePort> ({exc})"
+            )
+    return forwards
 
 
 # --------------------------------------------------------------------------- #
@@ -193,6 +264,84 @@ class Oci:
             self.bastion.delete_session(session_id)
         except oci.exceptions.ServiceError as exc:
             log.warning("could not delete session %s: %s", session_id[-12:], exc.message)
+
+
+# --------------------------------------------------------------------------- #
+# kubernetes (managed port-forwards; all blocking -- run via to_thread).       #
+# Port-forward is pod-scoped, so svc/deploy targets are resolved down to a     #
+# Running+Ready pod. Resolution happens per connection, so a restarted pod (or #
+# a rotated bastion tunnel under the relay) is picked up on the next connect.  #
+# --------------------------------------------------------------------------- #
+class Kube:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        # The kubeconfig authenticates with an exec plugin that shells out to the
+        # bundled `oci` CLI. systemd's ExecStart=venv/bin/python does NOT put
+        # venv/bin on PATH, so the bare `oci` command wouldn't be found; prepend
+        # our interpreter's bin dir so the plugin resolves the co-located CLI.
+        bindir = os.path.dirname(sys.executable)
+        if bindir and bindir not in os.environ.get("PATH", "").split(os.pathsep):
+            os.environ["PATH"] = bindir + os.pathsep + os.environ.get("PATH", "")
+        kube_config.load_kube_config(config_file=cfg.kubeconfig, context=cfg.kube_context)
+        self.core = kube_client.CoreV1Api()
+        self.apps = kube_client.AppsV1Api()
+        log.info("kubernetes client %s; kubeconfig %s", kube_version, cfg.kubeconfig)
+
+    def _ready_pod(self, ns, selector):
+        sel = ",".join(f"{k}={v}" for k, v in selector.items())
+        for pod in self.core.list_namespaced_pod(ns, label_selector=sel).items:
+            if pod.status.phase != "Running":
+                continue
+            if any(c.type == "Ready" and c.status == "True" for c in (pod.status.conditions or [])):
+                return pod
+        raise RuntimeError(f"no Running+Ready pod for selector '{sel}' in {ns}")
+
+    @staticmethod
+    def _service_target_port(svc, service_port):
+        """The targetPort backing the requested service port (named or numeric)."""
+        for sport in svc.spec.ports or []:
+            if sport.port == service_port:
+                return sport.target_port if sport.target_port is not None else sport.port
+        return service_port
+
+    @staticmethod
+    def _container_port(pod, target_port):
+        """Map a possibly-named targetPort to the pod's numeric container port."""
+        if isinstance(target_port, int):
+            return target_port
+        for container in pod.spec.containers:
+            for cport in container.ports or []:
+                if cport.name == target_port:
+                    return cport.container_port
+        raise RuntimeError(f"named port '{target_port}' not on pod {pod.metadata.name}")
+
+    def resolve_pod(self, fwd):
+        """Return (pod_name, pod_port) for a forward target."""
+        if fwd.kind == "pod":
+            return fwd.name, fwd.remote_port
+        if fwd.kind in ("svc", "service"):
+            svc = self.core.read_namespaced_service(fwd.name, fwd.ns)
+            if not svc.spec.selector:
+                raise RuntimeError(f"service {fwd.ns}/{fwd.name} has no selector")
+            pod = self._ready_pod(fwd.ns, svc.spec.selector)
+            target_port = self._service_target_port(svc, fwd.remote_port)
+            return pod.metadata.name, self._container_port(pod, target_port)
+        dep = self.apps.read_namespaced_deployment(fwd.name, fwd.ns)
+        pod = self._ready_pod(fwd.ns, dep.spec.selector.match_labels)
+        return pod.metadata.name, fwd.remote_port
+
+    def open_portforward(self, ns, pod, port):
+        """Open a port-forward to pod:port and return our end as a real socket.
+
+        kubernetes.stream.portforward runs a background thread that pumps bytes
+        between the API websocket and an internal socketpair; .socket(port) hands
+        back our end of that pair -- a real socket asyncio can drive. The thread
+        holds the WSClient alive and tears the websocket down when the socket
+        closes, so there's nothing else to retain.
+        """
+        return portforward(
+            self.core.connect_get_namespaced_pod_portforward, pod, ns, ports=str(port),
+        ).socket(port)
 
 
 # --------------------------------------------------------------------------- #
@@ -403,6 +552,47 @@ async def handle_client(client_reader, client_writer):
 
 
 # --------------------------------------------------------------------------- #
+# managed port-forwards                                                        #
+# --------------------------------------------------------------------------- #
+async def _forward_connection(kube, fwd, client_reader, client_writer):
+    """Resolve a ready pod, open a port-forward, and pipe one client through it.
+
+    Resolution + websocket setup happen per connection, so a restarted pod or a
+    rotated bastion tunnel is picked up on the next connection with no restart.
+    A failure here is connection-level only: the listener stays bound and the
+    next connection retries, mirroring how the 6443 relay never goes away.
+    """
+    try:
+        pod, port = await asyncio.to_thread(kube.resolve_pod, fwd)
+        log.debug("port-forward %s -> pod %s container port %s", fwd, pod, port)
+        sock = await asyncio.to_thread(kube.open_portforward, fwd.ns, pod, port)
+        up_reader, up_writer = await asyncio.open_connection(sock=sock)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log.warning("port-forward %s: connection failed (%s)", fwd, exc)
+        if not client_writer.is_closing():
+            client_writer.close()
+        return
+    await asyncio.gather(
+        _pipe(client_reader, up_writer),
+        _pipe(up_reader, client_writer),
+    )
+
+
+async def serve_forward(kube, fwd):
+    """Bind fwd.local_port for the daemon's life; reconnect underneath per conn.
+
+    Mirrors the 6443 relay: the local socket is held continuously, so clients
+    never see "connection refused" and never need a manual `kubectl` re-run.
+    """
+    async def handler(client_reader, client_writer):
+        await _forward_connection(kube, fwd, client_reader, client_writer)
+
+    server = await asyncio.start_server(handler, "127.0.0.1", fwd.local_port)
+    log.info("port-forward listening on 127.0.0.1:%s -> %s", fwd.local_port, fwd)
+    return server
+
+
+# --------------------------------------------------------------------------- #
 # main loop                                                                    #
 # --------------------------------------------------------------------------- #
 async def wait_for_rotation(active, lead):
@@ -439,6 +629,14 @@ async def run(cfg):
     STATE["upstream"] = active.port
     log.info("upstream -> :%s; cluster reachable on 127.0.0.1:%s", active.port, cfg.front_port)
 
+    # Managed port-forwards ride the now-live relay; bind each for the daemon's
+    # life so they self-heal across pod restarts and tunnel rotations.
+    forward_servers = []
+    if cfg.forwards:
+        kube = await asyncio.to_thread(Kube, cfg)
+        for fwd in cfg.forwards:
+            forward_servers.append(await serve_forward(kube, fwd))
+
     try:
         async with server:
             while True:
@@ -467,6 +665,8 @@ async def run(cfg):
                 active = new
     finally:
         log.info("shutting down -- cleaning up active session")
+        for fsrv in forward_servers:
+            fsrv.close()
         await retire(oci_client, active)
 
 
