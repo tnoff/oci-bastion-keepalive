@@ -84,6 +84,7 @@ import re
 import shlex
 import ssl
 import sys
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -285,6 +286,16 @@ class Kube:
         kube_config.load_kube_config(config_file=cfg.kubeconfig, context=cfg.kube_context)
         self.core = kube_client.CoreV1Api()
         self.apps = kube_client.AppsV1Api()
+        # kubernetes.stream.portforward sets up the websocket by temporarily
+        # monkeypatching api_client.request on the shared client, then restoring
+        # it. Each inbound connection opens its forward on its own thread (via
+        # asyncio.to_thread), so concurrent setups race on that swap: one thread's
+        # restore reinstates the plain-HTTP request mid-flight for another, which
+        # the API server rejects ("Upgrade request required"), or the interleave
+        # drops the `ports` query param ("Missing required parameter `ports`").
+        # The race is confined to setup -- once portforward() returns, each WSClient
+        # pumps over its own socket -- so serialising just the setup is enough.
+        self._pf_setup_lock = threading.Lock()
         log.info("kubernetes client %s; kubeconfig %s", kube_version, cfg.kubeconfig)
 
     def _ready_pod(self, ns, selector):
@@ -338,10 +349,17 @@ class Kube:
         back our end of that pair -- a real socket asyncio can drive. The thread
         holds the WSClient alive and tears the websocket down when the socket
         closes, so there's nothing else to retain.
+
+        The lock serialises the setup call only: portforward() swaps and restores
+        api_client.request on the shared client (see __init__), which is not safe
+        under the concurrent connections asyncio drives at us. The returned socket
+        is independent, so we hand it back outside the lock.
         """
-        return portforward(
-            self.core.connect_get_namespaced_pod_portforward, pod, ns, ports=str(port),
-        ).socket(port)
+        with self._pf_setup_lock:
+            forward = portforward(
+                self.core.connect_get_namespaced_pod_portforward, pod, ns, ports=str(port),
+            )
+        return forward.socket(port)
 
 
 # --------------------------------------------------------------------------- #
