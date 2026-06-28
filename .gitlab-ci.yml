@@ -1,24 +1,24 @@
 include:
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/bump-version.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/tag.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/release.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/renovate.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/spellcheck.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/trufflehog.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: c8c518c35c3d1de9d816c33304e1fe1e884e1509
+    ref: c3e8e55214cddced785b232cbee75d6c5e45ec81
     file: '/gitlab/discord-notify.yml'
 
 stages:
