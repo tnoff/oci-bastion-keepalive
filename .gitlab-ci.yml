@@ -37,7 +37,7 @@ default:
 # tox pytest/diff-cover matrix.
 lint:
   stage: validate
-  image: python:3.12-slim
+  image: python:3.14-slim
   script:
     - pip install --quiet tox
     - tox
