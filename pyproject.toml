@@ -13,12 +13,12 @@ authors = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "oci==2.178.0",
+    "oci==2.181.0",
     "kubernetes==31.0.0",
     # The kubeconfig authenticates via an exec plugin that runs the `oci` CLI
     # (`oci ce cluster generate-token`); bundle it so port-forwards work out of
-    # the box. Pinned to the build that resolves against oci==2.178.0.
-    "oci-cli==3.86.0",
+    # the box. Pinned to the build that resolves against oci==2.181.0.
+    "oci-cli==3.89.0",
 ]
 
 [project.urls]
