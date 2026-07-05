@@ -25,9 +25,9 @@ include:
     file: '/gitlab/discord-notify.yml'
 
 stages:
-  - validate
-  - tag
-  - release
+  - pr-check
+  - test
+  - push
   - notify
   - renovate
 
@@ -38,8 +38,8 @@ default:
 # Static-analysis gate via tox (pylint + bandit). Lint-only by design — this is
 # a single-file operational daemon, not a tested library, so there's no
 # tox pytest/diff-cover matrix.
-lint:
-  stage: validate
+"pr-check:lint":
+  stage: pr-check
   image: python:3.14-slim
   script:
     - pip install --quiet tox
@@ -51,12 +51,13 @@ lint:
     # spellcheck/trufflehog), leaving merges to run tag -> release -> notify.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
-spellcheck:
+"pr-check:spellcheck":
   extends: .spellcheck
+  stage: pr-check
 
-trufflehog:
+"pr-check:secrets":
   extends: .trufflehog
-  stage: validate
+  stage: pr-check
   rules:
     # Fork MRs require a project member to manually trigger jobs.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
@@ -74,25 +75,25 @@ bump-version:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//
 
 # On merge to main: tag v<VERSION> (no-op if it exists) ...
-tag-build:
+"push:tag":
   extends: .tag
-  stage: tag
+  stage: push
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_success
 
 # ... and cut a GitLab Release from that tag, using the CHANGELOG section.
-release:
+"push:release":
   extends: .release
-  stage: release
+  stage: push
   needs:
-    - job: tag-build
+    - job: "push:tag"
       artifacts: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_success
 
-notify-mr:
+"notify:mr-opened":
   extends: .discord-notify
   stage: notify
   needs: []
@@ -105,7 +106,7 @@ notify-mr:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
 
-notify-merged:
+"notify:merged":
   extends: .discord-notify
   stage: notify
   needs: []
@@ -116,10 +117,10 @@ notify-merged:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: always
 
-notify-tag-failure:
+"notify:tag-failure":
   extends: .discord-notify
   stage: notify
-  needs: [tag-build]
+  needs: ["push:tag"]
   variables:
     NOTIFY_TYPE: failure
     DISCORD_WEBHOOK_URL: $DISCORD_BUILD_FAILURE_WEBHOOK
@@ -127,10 +128,10 @@ notify-tag-failure:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_failure
 
-notify-release-failure:
+"notify:release-failure":
   extends: .discord-notify
   stage: notify
-  needs: [release]
+  needs: ["push:release"]
   allow_failure: true
   variables:
     NOTIFY_TYPE: failure
@@ -150,7 +151,7 @@ renovate:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
-notify-renovate-failure:
+"notify:renovate-failure":
   extends: .discord-notify
   stage: renovate
   needs: [renovate]
@@ -176,7 +177,7 @@ branch-cleanup:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
 
-notify-cleanup-failure:
+"notify:cleanup-failure":
   extends: .discord-notify
   stage: renovate
   needs: [branch-cleanup]
