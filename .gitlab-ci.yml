@@ -1,27 +1,27 @@
 include:
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/bump-version.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/tag.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/release.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/renovate.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/branch-cleanup.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/spellcheck.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/trufflehog.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: 61f9268632a8918105101e2e7f5b7b0d4f1f21e0
+    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
     file: '/gitlab/discord-notify.yml'
 
 stages:
