@@ -1,27 +1,30 @@
 include:
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/bump-version.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
+    file: '/gitlab/assemble-changelog.yml'
+  - project: 'tnoff-projects/github-workflows'
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/tag.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/release.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/renovate.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/branch-cleanup.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/spellcheck.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/trufflehog.yml'
   - project: 'tnoff-projects/github-workflows'
-    ref: cfe4637ce67d24b088e57e2f26db6ed9cc047f5b
+    ref: b0c827a5aef955ca22080b534519039d563d6f62
     file: '/gitlab/discord-notify.yml'
 
 stages:
@@ -74,10 +77,22 @@ bump-version:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//
 
+# Folds accumulated changelog.d/*.md fragments into CHANGELOG.md on the default
+# branch at release, deletes them, pushes back (idempotent — no-op when empty).
+"assemble-changelog":
+  extends: .assemble-changelog
+  stage: .pre
+  variables:
+    GITLAB_PUSH_TOKEN: $RENOVATE_TOKEN
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
+
 # On merge to main: tag v<VERSION> (no-op if it exists) ...
 "push:tag":
   extends: .tag
   stage: push
+  variables:
+    GATE_ON_FRAGMENTS: 'true'
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_success
