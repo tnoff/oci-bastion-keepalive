@@ -11,6 +11,12 @@
       "matchManagers": ["pep621"],
       "matchPackageNames": ["oci", "oci-cli"],
       "groupName": "oci python packages"
+    },
+    {
+      "description": "kubernetes 36.0.1+ requires pyyaml>=6.0.3, which conflicts with oci-cli's PyYAML<=6.0.2 pin (unresolvable pip set). Hold at 36.0.0 until oci-cli relaxes its PyYAML constraint.",
+      "matchManagers": ["pep621"],
+      "matchPackageNames": ["kubernetes"],
+      "allowedVersions": "<=36.0.0"
     }
   ]
 }

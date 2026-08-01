@@ -65,6 +65,20 @@ default:
     # spellcheck/trufflehog), leaving merges to run tag -> release -> notify.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
+# Resolve the full runtime dependency tree without installing anything. tox is
+# lint-only (skip_install=true), so nothing else in CI ever runs pip's resolver
+# against the pinned deps — which is how a kubernetes/oci-cli PyYAML conflict
+# once merged undetected. `--dry-run` raises ResolutionImpossible on any
+# unsatisfiable pin set. Upgrade pip first: --dry-run needs pip>=22.2.
+"pr-check:deps":
+  stage: pr-check
+  image: python:3.14-slim
+  script:
+    - pip install --quiet --upgrade pip
+    - pip install --dry-run .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
 "pr-check:spellcheck":
   extends: .spellcheck
   stage: pr-check

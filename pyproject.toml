@@ -14,7 +14,11 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "oci==2.183.0",
-    "kubernetes==36.0.3",
+    # Held at 36.0.0 — the newest kubernetes compatible with oci-cli. From
+    # 36.0.1 on it requires pyyaml>=6.0.3, but every oci-cli release (incl.
+    # 3.90.0) caps PyYAML<=6.0.2, so a newer kubernetes is an unresolvable pip
+    # set. Bump only if oci-cli relaxes its PyYAML pin.
+    "kubernetes==36.0.0",
     # The kubeconfig authenticates via an exec plugin that runs the `oci` CLI
     # (`oci ce cluster generate-token`); bundle it so port-forwards work out of
     # the box. Pinned to the build that resolves against oci==2.181.0.

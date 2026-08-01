@@ -14,3 +14,6 @@ dictionary.dic
 # Local, secret-bearing helper (real OCIDs)
 generate_session.sh
 .oci/
+
+# Local env
+env.rc
