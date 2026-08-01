@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.13] - 2026-08-01
+
+### Changed
+
+- fix(deps): pin kubernetes to 36.0.0 to resolve the oci-cli PyYAML conflict that broke `pip install`
+
 ## [0.2.12] - 2026-07-31
 
 ### Changed
