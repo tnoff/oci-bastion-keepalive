@@ -23,15 +23,10 @@ include:
   - project: 'tnoff-projects/github-workflows'
     ref: 9530be0ec03093026d61ade7a57556938812a829
     file: '/gitlab/trufflehog.yml'
-  - project: 'tnoff-projects/github-workflows'
-    ref: 9530be0ec03093026d61ade7a57556938812a829
-    file: '/gitlab/discord-notify.yml'
-
 stages:
   - pr-check
   - test
   - push
-  - notify
   - renovate
 
 default:
@@ -132,30 +127,6 @@ bump-version:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
       when: on_success
-
-"notify:mr-opened":
-  extends: .discord-notify
-  stage: notify
-  needs: []
-  variables:
-    NOTIFY_TYPE: mr_opened
-    DISCORD_WEBHOOK_URL: $DISCORD_MR_OPENED_WEBHOOK
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID != $CI_PROJECT_ID
-      when: manual
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
-
-"notify:merged":
-  extends: .discord-notify
-  stage: notify
-  needs: []
-  variables:
-    NOTIFY_TYPE: mr_merged
-    DISCORD_WEBHOOK_URL: $DISCORD_MR_MERGED_WEBHOOK
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != "schedule"
-      when: always
 
 renovate:
   extends: .renovate
