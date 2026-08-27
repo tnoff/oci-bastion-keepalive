@@ -1,0 +1,124 @@
+name: CI
+
+# Pull-request checks, ported from .gitlab-ci.yml's pr-check stage. Shared jobs
+# come from tnoff/github-workflows, SHA-pinned the same way the GitLab
+# `include:` refs were; Renovate's github-actions manager keeps the pins
+# current.
+#
+# Two jobs below are INLINE rather than reusable-workflow calls, and that is a
+# deliberate choice rather than an omission -- see each one.
+
+on:
+  pull_request:
+
+# One in-flight run per PR. Renovate force-pushes on rebase
+# (rebaseWhen: behind-base-branch), and without this every rebase leaves its
+# predecessor running to completion.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Scan for secrets
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+
+  spellcheck:
+    name: Spellcheck
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    with:
+      name: Markdown
+
+  # INLINE, not tnoff/github-workflows tox.yml.
+  #
+  # That reusable workflow cannot run here. Its discover step does
+  # `re.fullmatch(r'py(\d)(\d+)')` over `tox -l` and raises SystemExit when
+  # nothing matches; this repo's env_list is a single `lint` env, because it is
+  # a one-file operational daemon with no test suite by design (skip_install,
+  # pylint + bandit only). It would also try to upload a coverage.xml that is
+  # never produced, with if-no-files-found: error.
+  #
+  # Adding a lint-only mode to the shared workflow was considered and rejected:
+  # this is the only such repo in the fleet, so it would be shared surface for
+  # N=1. Promote it if a second repo ever needs it.
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Install tox
+        run: pip install --quiet tox
+
+      - name: Run tox
+        run: tox
+
+  # INLINE, and there is no template for this anywhere in github-workflows.
+  #
+  # Resolves the full runtime dependency tree without installing anything. tox
+  # above is lint-only (skip_install = true), so nothing else in CI ever runs
+  # pip's resolver against the pinned deps -- which is how a kubernetes/oci-cli
+  # PyYAML conflict once merged undetected. `--dry-run` raises
+  # ResolutionImpossible on any unsatisfiable pin set.
+  #
+  # This is the job the renovate.json packageRules exist to complement: oci and
+  # oci-cli are grouped so they move together, and kubernetes is held at
+  # <=36.0.0 for exactly the PyYAML conflict above. Dropping this check would
+  # leave those rules as the only guard, with nothing verifying them.
+  #
+  # pip is upgraded first: --dry-run needs pip>=22.2.
+  deps:
+    name: Resolve dependencies
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Resolve the pin set without installing
+        run: |
+          pip install --quiet --upgrade pip
+          pip install --dry-run .
+
+  bump-version:
+    name: Bump version
+    # NOTE: '^renovate/', NOT '^renovate/dev-' as everywhere else in the fleet.
+    # This repo's GitLab rule was deliberately broader -- every Renovate MR
+    # merges as its own taggable version here. Narrowing it to dev- would
+    # silently stop cutting releases for most updates.
+    if: startsWith(github.head_ref, 'renovate/')
+    permissions:
+      contents: write
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    with:
+      bump_changelog: true
+    secrets:
+      git_push_token: ${{ secrets.GIT_PUSH_TOKEN }}
+
+  auto-approve:
+    name: Auto-approve
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: tnoff/github-workflows/.github/workflows/renovate-auto-approve.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    with:
+      branch_pattern: '^renovate/'
+    secrets:
+      approval_token: ${{ secrets.APPROVAL_TOKEN }}
