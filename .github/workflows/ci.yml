@@ -24,11 +24,11 @@ permissions:
 jobs:
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@7211258c07503e00971c91988027b4f907ffe5b4
 
   spellcheck:
     name: Spellcheck
-    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@7211258c07503e00971c91988027b4f907ffe5b4
     with:
       name: Markdown
 
@@ -106,7 +106,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@7211258c07503e00971c91988027b4f907ffe5b4
     with:
       bump_changelog: true
     secrets:
@@ -117,7 +117,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: tnoff/github-workflows/.github/workflows/renovate-auto-approve.yml@c97852c991d7a4562844df68ab16717dfda54dd7
+    uses: tnoff/github-workflows/.github/workflows/renovate-auto-approve.yml@7211258c07503e00971c91988027b4f907ffe5b4
     with:
       branch_pattern: '^renovate/'
     secrets:
