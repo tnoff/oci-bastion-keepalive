@@ -112,13 +112,37 @@ jobs:
     secrets:
       git_push_token: ${{ secrets.GIT_PUSH_TOKEN }}
 
-  auto-approve:
-    name: Auto-approve
+  result:
+    name: CI result
+    # The stable name for the branch ruleset to require.
+    #
+    # Requiring the individual jobs by name does not gate anything: GitHub
+    # scores a `skipped` required check as SUCCESS, and every shared workflow
+    # here carries an `allow_fork_prs` gate that can skip its only job.
+    #
+    # This job always runs and its name never changes, so the ruleset requires
+    # exactly one context and the jobs underneath stay free to change.
+    if: always()
+    needs: [secrets, spellcheck, lint, deps]
+    runs-on: ubuntu-24.04
     permissions:
-      contents: write
-      pull-requests: write
-    uses: tnoff/github-workflows/.github/workflows/renovate-auto-approve.yml@7211258c07503e00971c91988027b4f907ffe5b4
-    with:
-      branch_pattern: '^renovate/'
-    secrets:
-      approval_token: ${{ secrets.APPROVAL_TOKEN }}
+      contents: read
+    steps:
+      - name: Summarise
+        run: |
+          echo "secrets:    ${{ needs.secrets.result }}"
+          echo "spellcheck: ${{ needs.spellcheck.result }}"
+          echo "lint:       ${{ needs.lint.result }}"
+          echo "deps:       ${{ needs.deps.result }}"
+
+      - name: Fail if any job failed
+        # `skipped` is deliberately allowed: with allow_fork_prs false a fork
+        # PR skips the cascade, which is the intended outcome, not a failure.
+        if: >-
+          needs.secrets.result == 'failure' || needs.secrets.result == 'cancelled' ||
+          needs.spellcheck.result == 'failure' || needs.spellcheck.result == 'cancelled' ||
+          needs.lint.result == 'failure' || needs.lint.result == 'cancelled' ||
+          needs.deps.result == 'failure' || needs.deps.result == 'cancelled'
+        run: |
+          echo "::error::One or more CI jobs did not pass."
+          exit 1
