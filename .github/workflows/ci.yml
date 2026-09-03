@@ -24,11 +24,11 @@ permissions:
 jobs:
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@362a5f0d06fec04588c60863ccf0bf2ce709917f
 
   spellcheck:
     name: Spellcheck
-    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@362a5f0d06fec04588c60863ccf0bf2ce709917f
     with:
       name: Markdown
 
@@ -106,7 +106,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@362a5f0d06fec04588c60863ccf0bf2ce709917f
     with:
       bump_changelog: true
     secrets:
