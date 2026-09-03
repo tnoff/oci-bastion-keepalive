@@ -24,11 +24,11 @@ permissions:
 jobs:
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@7211258c07503e00971c91988027b4f907ffe5b4
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
 
   spellcheck:
     name: Spellcheck
-    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@7211258c07503e00971c91988027b4f907ffe5b4
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
     with:
       name: Markdown
 
@@ -106,11 +106,12 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@7211258c07503e00971c91988027b4f907ffe5b4
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@8570bac7529b60e79b4fc6c837027d2f65fc0c9f
     with:
       bump_changelog: true
     secrets:
-      git_push_token: ${{ secrets.GIT_PUSH_TOKEN }}
+      app_id: ${{ secrets.CI_APP_ID }}
+      app_private_key: ${{ secrets.CI_APP_PRIVATE_KEY }}
 
   result:
     name: CI result
