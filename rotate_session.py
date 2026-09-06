@@ -286,23 +286,41 @@ class Kube:
         kube_config.load_kube_config(config_file=cfg.kubeconfig, context=cfg.kube_context)
         # kubernetes 36.0.0 disagrees with itself about where the bearer token
         # lives. The kubeconfig loader writes it to api_key["authorization"]
-        # (config/kube_config.py), but the generated client reads
+        # (config/kube_config.py::_set_config), but the generated client reads
         # api_key["BearerToken"] (client/configuration.py::auth_settings), finds
         # nothing, and sends the request with NO Authorization header at all.
-        # The API server answers a clean 401, which is indistinguishable from an
-        # expired credential -- the tunnel is up, the exec plugin mints a valid
-        # token, `kubectl` works, and every call from here still fails.
+        # The API server answers a clean 401, indistinguishable from an expired
+        # credential.
         #
-        # Copying the value across bridges the two halves. Deliberately not a
-        # version bump: 36.0.0 is pinned in pyproject.toml as the newest release
-        # compatible with oci-cli's PyYAML<=6.0.2 cap, so there is nothing newer
-        # to move to and nothing older that keeps the CLI resolvable. The copy is
-        # a no-op on any version where the two names already agree, so it can
-        # stay after upstream fixes this.
+        # Mirroring the value across fixes that -- but it has to be mirrored on
+        # every refresh, not once at startup, and the re-arm below is not
+        # optional:
+        #
+        #   * get_api_key_with_prefix() calls refresh_api_key_hook BEFORE
+        #     reading the key, so the hook is where a fresh token appears.
+        #   * The loader's hook re-execs the plugin only once the token has
+        #     expired, then calls _set_config() to write the new value.
+        #   * _set_config() also REASSIGNS refresh_api_key_hook to its own
+        #     closure -- so a wrapper that does not reinstall itself is
+        #     unhooked the first time it runs, and the mirror silently freezes
+        #     at the startup token.
+        #
+        # A one-shot copy therefore works for exactly one token lifetime and
+        # then 401s forever, which is the shape of "it worked for a bit".
         _kube_cfg = kube_client.Configuration.get_default_copy()
-        if "authorization" in _kube_cfg.api_key and "BearerToken" not in _kube_cfg.api_key:
-            _kube_cfg.api_key["BearerToken"] = _kube_cfg.api_key["authorization"]
-            kube_client.Configuration.set_default(_kube_cfg)
+        _loader_hook = _kube_cfg.refresh_api_key_hook
+
+        def _mirror_bearer_token(configuration):
+            if _loader_hook is not None:
+                _loader_hook(configuration)
+            token = configuration.api_key.get("authorization")
+            if token is not None:
+                configuration.api_key["BearerToken"] = token
+            # Re-arm: _set_config just replaced us with the loader's own hook.
+            configuration.refresh_api_key_hook = _mirror_bearer_token
+
+        _mirror_bearer_token(_kube_cfg)
+        kube_client.Configuration.set_default(_kube_cfg)
         self.core = kube_client.CoreV1Api()
         self.apps = kube_client.AppsV1Api()
         # kubernetes.stream.portforward sets up the websocket by temporarily
