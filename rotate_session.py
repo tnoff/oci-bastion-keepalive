@@ -284,6 +284,25 @@ class Kube:
         if bindir and bindir not in os.environ.get("PATH", "").split(os.pathsep):
             os.environ["PATH"] = bindir + os.pathsep + os.environ.get("PATH", "")
         kube_config.load_kube_config(config_file=cfg.kubeconfig, context=cfg.kube_context)
+        # kubernetes 36.0.0 disagrees with itself about where the bearer token
+        # lives. The kubeconfig loader writes it to api_key["authorization"]
+        # (config/kube_config.py), but the generated client reads
+        # api_key["BearerToken"] (client/configuration.py::auth_settings), finds
+        # nothing, and sends the request with NO Authorization header at all.
+        # The API server answers a clean 401, which is indistinguishable from an
+        # expired credential -- the tunnel is up, the exec plugin mints a valid
+        # token, `kubectl` works, and every call from here still fails.
+        #
+        # Copying the value across bridges the two halves. Deliberately not a
+        # version bump: 36.0.0 is pinned in pyproject.toml as the newest release
+        # compatible with oci-cli's PyYAML<=6.0.2 cap, so there is nothing newer
+        # to move to and nothing older that keeps the CLI resolvable. The copy is
+        # a no-op on any version where the two names already agree, so it can
+        # stay after upstream fixes this.
+        _kube_cfg = kube_client.Configuration.get_default_copy()
+        if "authorization" in _kube_cfg.api_key and "BearerToken" not in _kube_cfg.api_key:
+            _kube_cfg.api_key["BearerToken"] = _kube_cfg.api_key["authorization"]
+            kube_client.Configuration.set_default(_kube_cfg)
         self.core = kube_client.CoreV1Api()
         self.apps = kube_client.AppsV1Api()
         # kubernetes.stream.portforward sets up the websocket by temporarily
