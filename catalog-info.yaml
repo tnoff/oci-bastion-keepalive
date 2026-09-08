@@ -18,6 +18,6 @@ metadata:
     across the bastion session's hard TTL, by rotating sessions under a fixed local
     port. Runs on the workstation, not in the cluster.
 spec:
-  type: tool
+  type: library
   owner: group:default/admin
   lifecycle: production
