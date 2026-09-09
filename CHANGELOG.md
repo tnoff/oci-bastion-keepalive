@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.21] - 2026-09-09
+
+### Changed
+
+- fix: bridge the bearer-token key mismatch in kubernetes 36.0.0, which silently sent every API call unauthenticated and 401'd all port-forwards
+- fix: mirror the bearer token on every refresh, not once at startup — a one-shot copy froze at the first token and 401'd again once it expired
+- chore(deps): update https://github.com/tnoff/github-workflows digest to 8579e03
+
 ## [0.2.18] - 2026-08-21
 
 ### Changed
