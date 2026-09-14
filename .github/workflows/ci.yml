@@ -24,11 +24,11 @@ permissions:
 jobs:
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@8579e03b50ee081f47dd1989b79c6a057ee35867
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@0d92c3c09cf7dd78ce36cb5f40618e7fc296e6a2
 
   spellcheck:
     name: Spellcheck
-    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@8579e03b50ee081f47dd1989b79c6a057ee35867
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@0d92c3c09cf7dd78ce36cb5f40618e7fc296e6a2
     with:
       name: Markdown
 
@@ -106,7 +106,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@8579e03b50ee081f47dd1989b79c6a057ee35867
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@0d92c3c09cf7dd78ce36cb5f40618e7fc296e6a2
     with:
       bump_changelog: true
     secrets:
@@ -120,7 +120,7 @@ jobs:
   # left `Release` dead in nine repos for five days in September 2026.
   contracts:
     name: Workflow contracts
-    uses: tnoff/github-workflows/.github/workflows/check-workflow-contracts.yml@2740215791774b60db5cb6da23da260de2e6dfd8
+    uses: tnoff/github-workflows/.github/workflows/check-workflow-contracts.yml@0d92c3c09cf7dd78ce36cb5f40618e7fc296e6a2
 
   result:
     name: CI result
