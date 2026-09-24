@@ -1,6 +1,6 @@
 [Unit]
 Description=Self-rotating OCI bastion port-forward to the OKE API server
-Documentation=https://gitlab.com/tnoff-projects/oci-bastion-keepalive/-/blob/main/rotate_session.py
+Documentation=https://github.com/tnoff/oci-bastion-keepalive/blob/main/rotate_session.py
 After=network-online.target
 Wants=network-online.target
 

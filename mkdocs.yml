@@ -1,0 +1,9 @@
+site_name: 'oci-bastion-keepalive'
+site_description: 'Keeps a long-lived OCI bastion port-forward to a private OKE API server alive across the session hard-TTL, by rotating sessions under a fixed local port'
+
+nav:
+  - Home: README.md
+  - Contributing: CONTRIBUTING.md
+
+plugins:
+  - techdocs-core
