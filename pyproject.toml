@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://gitlab.com/tnoff-projects/oci-bastion-keepalive"
+Homepage = "https://github.com/tnoff/oci-bastion-keepalive"
 
 [project.scripts]
 oci-bastion-keepalive = "rotate_session:main"
