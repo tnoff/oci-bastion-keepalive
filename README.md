@@ -49,7 +49,9 @@ oci-bastion-keepalive          # or: python rotate_session.py
 ```
 
 Point your kubeconfig at `https://127.0.0.1:6443` and leave the daemon running.
-Ctrl-C cleans up the active bastion session on exit.
+Ctrl-C cleans up the active bastion session on exit. For a one-shot session
+without the daemon, see the one-shot section of
+[local cluster access](https://github.com/tnoff/oci-bastion-keepalive/blob/main/docs/cluster-access.md).
 
 ### Run it unattended (systemd --user)
 
@@ -73,7 +75,10 @@ Everything is environment-driven — no OCIDs or tuning are baked in. Only
 is capped to the bastion's maximum. See
 [`rotate_session.env.example`](https://github.com/tnoff/oci-bastion-keepalive/blob/main/rotate_session.env.example) for the full list of
 optional knobs (region, profile, TTL, rotation lead time, ports, SSH key paths,
-health-check timeouts, …) with their defaults.
+health-check timeouts, …) with their defaults. `OCI_REGION` defaults to the
+region in your OCI config, and the SSH keypair defaults to `~/.ssh/id_rsa{,.pub}`.
+The rotation steps, gotchas and operations notes live in
+[local cluster access](https://github.com/tnoff/oci-bastion-keepalive/blob/main/docs/cluster-access.md).
 
 ## Managed port-forwards
 
