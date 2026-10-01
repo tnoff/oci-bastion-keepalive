@@ -71,7 +71,7 @@ venv live somewhere other than `~/Code/oci-bastion-keepalive`.)
 Everything is environment-driven — no OCIDs or tuning are baked in. Only
 `OKE_CLUSTER_OCID` and `OKE_BASTION_OCID` are required; the requested session TTL
 is capped to the bastion's maximum. See
-[`rotate_session.env.example`](rotate_session.env.example) for the full list of
+[`rotate_session.env.example`](https://github.com/tnoff/oci-bastion-keepalive/blob/main/rotate_session.env.example) for the full list of
 optional knobs (region, profile, TTL, rotation lead time, ports, SSH key paths,
 health-check timeouts, …) with their defaults.
 

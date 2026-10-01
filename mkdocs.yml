@@ -3,6 +3,7 @@ site_description: 'Keeps a long-lived OCI bastion port-forward to a private OKE 
 
 nav:
   - Home: README.md
+  - Local cluster access: cluster-access.md
   - Contributing: CONTRIBUTING.md
 
 plugins:
