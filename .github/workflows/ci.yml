@@ -72,13 +72,13 @@ jobs:
     name: Scan for secrets
     needs: metadata
     if: needs.metadata.outputs.only != 'true'
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@f6569d2b6f242fb91759fe0ebfa990a99c09585b
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@b1932282111367882be5ad0730eecbe379be3fe0
 
   spellcheck:
     name: Spellcheck
     needs: metadata
     if: needs.metadata.outputs.only != 'true'
-    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@f6569d2b6f242fb91759fe0ebfa990a99c09585b
+    uses: tnoff/github-workflows/.github/workflows/spellcheck.yml@b1932282111367882be5ad0730eecbe379be3fe0
     with:
       name: Markdown
 
@@ -160,7 +160,7 @@ jobs:
     if: startsWith(github.head_ref, 'renovate/')
     permissions:
       contents: write
-    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@f6569d2b6f242fb91759fe0ebfa990a99c09585b
+    uses: tnoff/github-workflows/.github/workflows/bump-version.yml@b1932282111367882be5ad0730eecbe379be3fe0
     with:
       bump_changelog: true
     secrets:
@@ -176,7 +176,7 @@ jobs:
     name: Workflow contracts
     needs: metadata
     if: needs.metadata.outputs.only != 'true'
-    uses: tnoff/github-workflows/.github/workflows/check-workflow-contracts.yml@f6569d2b6f242fb91759fe0ebfa990a99c09585b
+    uses: tnoff/github-workflows/.github/workflows/check-workflow-contracts.yml@b1932282111367882be5ad0730eecbe379be3fe0
 
   result:
     name: CI result
