@@ -10,7 +10,7 @@ license = { file = "LICENSE.md" }
 authors = [
     { name = "Tyler D. North", email = "me@tyler-north.com" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
     "oci==2.187.2",
