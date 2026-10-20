@@ -82,23 +82,69 @@ jobs:
     with:
       name: Markdown
 
-  # INLINE, not tnoff/github-workflows tox.yml.
+  # The interpreter matrix comes from tox.ini (`tox -l`), the same pattern as
+  # the shared tox.yml and discord-bot, so adding or dropping a pyXY env there
+  # is the only edit needed. Inline for the same reason as `lint` below.
+  discover:
+    name: Discover tox environments
+    needs: metadata
+    if: needs.metadata.outputs.only != 'true'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      versions: ${{ steps.list.outputs.versions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.x'
+
+      - name: Install tox
+        run: pip install --quiet tox
+
+      - name: List environments
+        id: list
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, re, subprocess
+
+          out = subprocess.run(['tox', '-l'], capture_output=True, text=True, check=True)
+          versions = []
+          for env in out.stdout.split():
+              m = re.fullmatch(r'py(\d)(\d+)', env)
+              if m:
+                  versions.append(f'{m.group(1)}.{m.group(2)}')
+          if not versions:
+              raise SystemExit('No py<X><Y> envs found via `tox -l`')
+          print(f'versions={versions}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f'versions={json.dumps(versions)}\n')
+          PYEOF
+
+  # INLINE, not tnoff/github-workflows tox.yml. The matrix still comes from
+  # tox.ini via `discover` above.
   #
-  # That reusable workflow cannot run here. Its discover step does
-  # `re.fullmatch(r'py(\d)(\d+)')` over `tox -l` and raises SystemExit when
-  # nothing matches; this repo's env_list is a single `lint` env, because it is
-  # a one-file operational daemon with no test suite by design (skip_install,
-  # pylint + bandit only). It would also try to upload a coverage.xml that is
-  # never produced, with if-no-files-found: error.
+  # That reusable workflow cannot run here: the pyXY envs are lint-only
+  # (skip_install, pylint + bandit; a one-file operational daemon with no test
+  # suite by design), so it would try to upload a coverage.xml that is never
+  # produced, with if-no-files-found: error, and diff-cover has nothing to read.
   #
   # Adding a lint-only mode to the shared workflow was considered and rejected:
   # this is the only such repo in the fleet, so it would be shared surface for
   # N=1. Promote it if a second repo ever needs it.
   lint:
-    name: Lint
-    needs: metadata
+    name: Lint (${{ matrix.python }})
+    needs: [metadata, discover]
     if: needs.metadata.outputs.only != 'true'
     runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJSON(needs.discover.outputs.versions) }}
     permissions:
       contents: read
     steps:
@@ -108,13 +154,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          python-version: '3.15'
+          python-version: ${{ matrix.python }}
 
       - name: Install tox
         run: pip install --quiet tox
 
       - name: Run tox
-        run: tox
+        env:
+          PYTHON_VERSION: ${{ matrix.python }}
+        run: tox -e "py${PYTHON_VERSION//./}"
 
   # INLINE, and there is no template for this anywhere in github-workflows.
   #
@@ -131,10 +179,14 @@ jobs:
   #
   # pip is upgraded first: --dry-run needs pip>=22.2.
   deps:
-    name: Resolve dependencies
-    needs: metadata
+    name: Resolve dependencies (${{ matrix.python }})
+    needs: [metadata, discover]
     if: needs.metadata.outputs.only != 'true'
     runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJSON(needs.discover.outputs.versions) }}
     permissions:
       contents: read
     steps:
@@ -144,7 +196,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          python-version: '3.15'
+          python-version: ${{ matrix.python }}
 
       - name: Resolve the pin set without installing
         run: |
@@ -189,7 +241,7 @@ jobs:
     # This job always runs and its name never changes, so the ruleset requires
     # exactly one context and the jobs underneath stay free to change.
     if: always()
-    needs: [secrets, spellcheck, lint, deps, contracts, metadata]
+    needs: [secrets, spellcheck, discover, lint, deps, contracts, metadata]
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -199,6 +251,7 @@ jobs:
           echo "secrets:    ${{ needs.secrets.result }}"
           echo "metadata:  ${{ needs.metadata.result }}"
           echo "spellcheck: ${{ needs.spellcheck.result }}"
+          echo "discover:   ${{ needs.discover.result }}"
           echo "lint:       ${{ needs.lint.result }}"
           echo "deps:       ${{ needs.deps.result }}"
           echo "contracts:  ${{ needs.contracts.result }}"
@@ -209,6 +262,7 @@ jobs:
         if: >-
           needs.secrets.result == 'failure' || needs.secrets.result == 'cancelled' ||
           needs.spellcheck.result == 'failure' || needs.spellcheck.result == 'cancelled' ||
+          needs.discover.result == 'failure' || needs.discover.result == 'cancelled' ||
           needs.lint.result == 'failure' || needs.lint.result == 'cancelled' ||
           needs.deps.result == 'failure' || needs.deps.result == 'cancelled' ||
           needs.contracts.result == 'failure' || needs.contracts.result == 'cancelled' ||

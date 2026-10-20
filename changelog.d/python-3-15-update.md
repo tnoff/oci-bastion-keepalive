@@ -1,0 +1,1 @@
+Changed the supported Python floor to 3.13; tox now has py313-py315 envs and CI builds its lint and dependency-resolution matrix from `tox -l`, so both run on every supported interpreter instead of 3.15 only
