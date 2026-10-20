@@ -27,7 +27,7 @@ early, it rotates immediately instead of waiting for the timer.
 
 ## Requirements
 
-- Python 3.10+ (the [OCI Python SDK](https://pypi.org/project/oci/) is pulled in
+- Python 3.13+ (the [OCI Python SDK](https://pypi.org/project/oci/) is pulled in
   as a dependency on install)
 - A configured OCI profile (`~/.oci/config`) with permission to manage bastion
   sessions and read the target cluster
