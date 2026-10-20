@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-20
+
+### Changed
+
+- Changed the supported Python floor to 3.13; tox now has py313-py315 envs and CI builds its lint and dependency-resolution matrix from `tox -l`, so both run on every supported interpreter instead of 3.15 only
+
 ## [0.2.31] - 2026-10-17
 
 ### Changed
