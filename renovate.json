@@ -7,6 +7,11 @@
   "enabledManagers": ["github-actions", "pep621", "custom.regex"],
   "packageRules": [
     {
+      "description": "CI-only updates (action pins, reusable-workflow pins) change nothing that ships, so they must not cut a release. They land under the ci- branch prefix, which ci.yml's bump-version job excludes. Every other Renovate branch still bumps, per the deliberately broad gate there.",
+      "matchFileNames": [".github/**"],
+      "additionalBranchPrefix": "ci-"
+    },
+    {
       "description": "oci-cli pins the oci SDK to an exact version (e.g. oci-cli==3.89.0 requires oci==2.181.0), so the two must upgrade together in one MR — a lone oci bump produces an unresolvable pip set.",
       "matchManagers": ["pep621"],
       "matchPackageNames": ["oci", "oci-cli"],
