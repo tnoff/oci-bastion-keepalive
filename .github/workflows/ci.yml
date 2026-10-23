@@ -208,8 +208,9 @@ jobs:
     # NOTE: '^renovate/', NOT '^renovate/dev-' as everywhere else in the fleet.
     # This repo's GitLab rule was deliberately broader -- every Renovate MR
     # merges as its own taggable version here. Narrowing it to dev- would
-    # silently stop cutting releases for most updates.
-    if: startsWith(github.head_ref, 'renovate/')
+    # silently stop cutting releases for most updates. The one exception is
+    # 'renovate/ci-' (renovate.json): workflow-only updates ship nothing.
+    if: startsWith(github.head_ref, 'renovate/') && !startsWith(github.head_ref, 'renovate/ci-')
     permissions:
       contents: write
     uses: tnoff/github-workflows/.github/workflows/bump-version.yml@93f9034849dfd1d98ed72629241a503d29842205  # bump-version-v1.1.0
